@@ -53,7 +53,7 @@ for modelfile in glob.glob("blueprints/**/*.bbmodel", recursive=True):
         #Remove Animtion Frame
         if texture.get("frame_time", 1) > 1:
             height = texture_image.height // texture.get("frame_time")
-            texture_image = texture_image.crop(0, 0, texture_image.width, height)
+            texture_image = texture_image.crop((0, 0, texture_image.width, height))
 
         textures["data"][str(slot)] = {"image": texture_image,"position": textures.get("height",0)}
         textures["width"] = max(textures["width"], texture_image.width)
