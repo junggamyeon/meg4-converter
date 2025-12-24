@@ -2,7 +2,7 @@
 import os
 import sys
 import json
-from ultis.font import collect_png, pack_sheet, chunk
+from utils.font import collect_png, pack_sheet, chunk
 
 UNICODE_START = 0xE000
 MAX_GLYPHS = 256
