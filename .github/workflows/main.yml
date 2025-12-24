@@ -1,0 +1,50 @@
+name: BBModel Zip -> Bedrock Zip
+
+on:
+  workflow_dispatch:
+    inputs:
+      file-download-url:
+        description: "Discord CDN zip link (.zip)"
+        required: true
+        type: string
+
+jobs:
+  Convert:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pillow python-dotenv
+
+      - name: Download bbmodel zip (Discord CDN safe)
+        run: |
+          mkdir -p blueprints
+          curl -L \
+            -A "Mozilla/5.0" \
+            -H "Accept: */*" \
+            -o blueprints/input.zip \
+            "${{ inputs.file-download-url }}"
+
+      - name: Convert to Bedrock
+        env:
+          file: blueprints/input.zip
+        run: python main.py
+
+      - name: Pack output to zip
+        run: |
+          cd output
+          zip -r ../Converted.zip .
+          cd ..
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Converted
+          path: Converted.zip
