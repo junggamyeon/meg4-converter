@@ -1,96 +1,135 @@
+from __future__ import annotations
 from utils.texture import Texture
 
 class Model:
-    def __init__(self, data: dict, texture: Texture = None) -> None:
-        self.elements = self.__sort_elements(data["elements"])
-        self.outliner = data["outliner"]
+    def __init__(self, data: dict, texture: Texture | None = None, identifier: str = "geometry.converted") -> None:
+        self.elements = self.__sort_elements(data.get("elements", []))
+        self.outliner = data.get("outliner", [])
         self.texture = texture
-        self.bones = []
-    
+        self.identifier = identifier
+        self.bones: list[dict] = []
+
+    @staticmethod
+    def __sort_elements(elements: list) -> list:
+        # Keep stable ordering; bbmodel elements have "uuid"
+        try:
+            return sorted(elements, key=lambda x: x.get("uuid", ""))
+        except Exception:
+            return elements
+
     @staticmethod
     def __get_origin(from_to: tuple[list, list]) -> list:
         origin = [-from_to[1][0], from_to[0][1], from_to[0][2]]
         return origin
 
     @staticmethod
-    def __get_rotation(rotation: list[int]) -> list:
+    def __get_rotation(rotation: dict) -> dict | None:
         if not rotation:
-            return
-        rotation[0] = -rotation[0]
-        rotation[1] = -rotation[1]
-        return rotation
-    
-    @staticmethod
-    def __get_size(from_to: tuple[list, list]) -> list:
-        return [from_to[1][i] - from_to[0][i] for i in range(3)]
-    
-    @staticmethod
-    def __get_pivot(origin: list) -> list:
-        origin[0] = -origin[0]
-        return origin
-    
-    def __sort_elements(self, elements: list) -> dict:
-        elementlist = {}
-        for element in elements:
-            elementlist[element["uuid"]] = element
-        return elementlist
+            return None
+        origin = rotation.get("origin")
+        axis = rotation.get("axis")
+        angle = rotation.get("angle")
+        if origin is None or axis is None or angle is None:
+            return None
+        # Bedrock cube rotation is per-axis degrees; Blockbench gives axis+angle
+        rot = [0.0, 0.0, 0.0]
+        if axis == "x":
+            rot[0] = float(angle)
+        elif axis == "y":
+            rot[1] = float(angle)
+        elif axis == "z":
+            rot[2] = float(angle)
+        return {"pivot": [-origin[0], origin[1], origin[2]], "rotation": rot}
 
-    def __get_uv(self, element) -> dict:
-        return {
-            "north": self.texture.get_uv("north", element["faces"]),
-            "east": self.texture.get_uv("east", element["faces"]),
-            "south": self.texture.get_uv("south", element["faces"]),
-            "west": self.texture.get_uv("west", element["faces"]),
-            "up": self.texture.get_uv("up", element["faces"]),
-            "down": self.texture.get_uv("down", element["faces"])
-        } if "faces" in element and self.texture else {}
-    
-    def __convert_element(self, element: dict = None, outliner: dict = None, parent: str = None) -> dict | None:
-        if element:
-            cube = {
-                "rotation": Model.__get_rotation(element.get("rotation", [0, 0, 0])),
-                "size": Model.__get_size((element.get("from", [0, 0, 0]), element.get("to", [0, 0, 0]))),
-                "origin": Model.__get_origin((element.get("from", [0, 0, 0]), element.get("to", [0,0,0]))),
-                "pivot": Model.__get_pivot(element.get("origin", [0,0,0])),
-                "uv": self.__get_uv(element)
-            }
-            return cube if element.get("type", "cube").lower() == "cube" else None
-        elif outliner:
-            group = {
-                "name": outliner["name"],
-                "pivot": Model.__get_pivot(outliner.get("origin", None)),
-                "rotation": Model.__get_rotation(outliner.get("rotation", None)),
-                "cubes": []
-            }
-            if parent:
-                group["parent"] = parent
-            return group
+    def __element_to_cube(self, element: dict) -> dict:
+        frm = element.get("from", [0, 0, 0])
+        to = element.get("to", [0, 0, 0])
 
-    def outliner_worker(self, bone: dict, outliners: list, parent: str = None) -> None:
-        for outliner in outliners:
-            if isinstance(outliner, str):
-                bone["cubes"].append(self.__convert_element(self.elements[outliner]))
-            elif isinstance(outliner, dict):
-                group = self.__convert_element(outliner=outliner, parent=parent)
-                self.outliner_worker(group, outliner.get("children", []), group["name"])
-                self.bones.append(group)
+        cube = {
+            "origin": [-to[0], frm[1], frm[2]],
+            "size": [to[0] - frm[0], to[1] - frm[1], to[2] - frm[2]],
+        }
+
+        # UV mapping
+        if self.texture and element.get("faces"):
+            uv = {}
+            for face_name, face in element["faces"].items():
+                mapped = self.texture.get_uv(face_name, face)
+                if mapped:
+                    uv[face_name] = mapped
+            if uv:
+                cube["uv"] = uv
+
+        # Rotation (optional)
+        rot = self.__get_rotation(element.get("rotation"))
+        if rot:
+            cube.update(rot)
+
+        # Inflate (optional)
+        if element.get("inflate"):
+            cube["inflate"] = float(element["inflate"])
+
+        return cube
+
+    def outliner_worker(self, group: dict, outliner: list, parent: str | None = None) -> None:
+        for i in outliner:
+            # Group node
+            if isinstance(i, dict) and i.get("children") is not None:
+                bone = {"name": i.get("name", "bone"), "pivot": [0, 0, 0]}
+                if parent:
+                    bone["parent"] = parent
+                pivot = i.get("origin")
+                if pivot:
+                    bone["pivot"] = [-pivot[0], pivot[1], pivot[2]]
+                cubes = []
+                # Children can be uuids referencing elements, or nested groups
+                for child in i.get("children", []):
+                    if isinstance(child, str):
+                        el = next((e for e in self.elements if e.get("uuid") == child), None)
+                        if el:
+                            cubes.append(self.__element_to_cube(el))
+                    elif isinstance(child, dict):
+                        # nested group; handled below by recursion
+                        pass
+                if cubes:
+                    bone["cubes"] = cubes
+                self.bones.append(bone)
+                # Recurse nested groups
+                nested = [c for c in i.get("children", []) if isinstance(c, dict)]
+                if nested:
+                    self.outliner_worker({}, nested, bone["name"])
+            # Direct element uuid at root
+            elif isinstance(i, str):
+                el = next((e for e in self.elements if e.get("uuid") == i), None)
+                if el:
+                    root_bone = {"name": "bones", "pivot": [0, 0, 0], "cubes": [self.__element_to_cube(el)]}
+                    if root_bone not in self.bones:
+                        self.bones.append(root_bone)
 
     def to_geometry_bedrock(self) -> dict:
+        # Use a broadly compatible schema version for entity geometry
+        # (format_version is NOT the game version.)
         geometry = {
-            "format_version": "1.21.0",
+            "format_version": "1.12.0",
             "minecraft:geometry": [
                 {
                     "description": {
-                        "identifier": "geometry.meg",
+                        "identifier": self.identifier,
                         "texture_width": self.texture.image.width if self.texture else 0,
                         "texture_height": self.texture.image.height if self.texture else 0
-                     },
-                    "bones": self.bones
+                    },
+                    "bones": []
                 }
             ]
         }
-        bone = {"name": "bones", "pivot": [0,0,0], "cubes": []}
-        self.outliner_worker(bone, self.outliner)
-        if bone["cubes"]:
-            self.bones.append(bone)
+
+        self.bones = []
+        # Build bones from outliner
+        self.outliner_worker({"name": "bones", "pivot": [0, 0, 0], "cubes": []}, self.outliner)
+
+        # Ensure there is at least a root bone if outliner did not create one
+        if not any(b.get("name") == "bones" for b in self.bones):
+            self.bones.insert(0, {"name": "bones", "pivot": [0, 0, 0]})
+
+        geometry["minecraft:geometry"][0]["bones"] = self.bones
         return geometry
