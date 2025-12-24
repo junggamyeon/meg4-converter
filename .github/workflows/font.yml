@@ -1,0 +1,44 @@
+name: Font Converter
+
+on:
+  workflow_dispatch:
+    inputs:
+      zip_url:
+        description: "Public ZIP URL containing PNG glyphs"
+        required: true
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pillow
+
+      - name: Download input
+        run: |
+          curl -L "${{ inputs.zip_url }}" -o input.zip
+          unzip input.zip -d input
+
+      - name: Convert
+        run: |
+          python font.py input output
+
+      - name: Zip result
+        run: |
+          cd output
+          zip -r font_pack.zip .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bedrock-font
+          path: output/font_pack.zip
