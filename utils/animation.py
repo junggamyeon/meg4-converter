@@ -29,36 +29,34 @@ class Animation:
         }
 
         for anim in self.animations:
-            name = anim.get("name", "unnamed")
-            bedrock_name = self.__bedrock_name(name, self.namespace)
+            raw_name = anim.get("name", "unnamed")
+            bedrock_name = self.__bedrock_name(raw_name, self.namespace)
 
             entry = {
                 "loop": self.__loop_value(anim.get("loop", "once")),
                 "bones": {}
             }
 
-            for bone in anim.get("bones", []):
-                bone_name = bone.get("name", "root")
-                frames = bone.get("keyframes", [])
+            # Giữ logic cũ: copy raw bone structure
+            for bone_name, bone_data in anim.get("bones", {}).items():
+                if not isinstance(bone_data, dict):
+                    continue
 
                 bone_entry = {}
 
-                for frame in frames:
-                    channel = frame.get("channel")
-
+                for channel, timeline in bone_data.items():
                     if channel not in ("rotation", "position", "scale"):
                         continue
 
-                    time = str(frame.get("time", 0))
-                    value = frame.get("value", [0, 0, 0])
-
-                    if channel not in bone_entry:
-                        bone_entry[channel] = {}
-
-                    bone_entry[channel][time] = value
+                    if isinstance(timeline, dict) and timeline:
+                        bone_entry[channel] = timeline
 
                 if bone_entry:
                     entry["bones"][bone_name] = bone_entry
+
+            # Nếu animation thật sự không có bone → bỏ qua animation này
+            if not entry["bones"]:
+                continue
 
             data["animations"][bedrock_name] = entry
 
