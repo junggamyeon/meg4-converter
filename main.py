@@ -127,9 +127,9 @@ for modelfile in glob.glob("blueprints/**/*.bbmodel", recursive=True):
 
     animations = data.get("animations", [])
     if animations:
-        anim_exporter = Animation(animations, namespace=name)
-        anim_exporter.export(os.path.join(anim_dir, f"{name}.animation.json"))
-
+        anim_exporter = Animation(data.get("animations", []), namespace=name)
+        animations = anim_exporter.to_bedrock()
+        write_json(os.path.join(anim_dir, f"{name}.animation.json"), animations)
     converted_any = True
 
 if not converted_any:
