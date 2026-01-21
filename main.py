@@ -19,23 +19,24 @@ PACK_UUID_1 = os.getenv("PACK_UUID_1", str(uuid.uuid4()))
 PACK_UUID_2 = os.getenv("PACK_UUID_2", str(uuid.uuid4()))
 PACK_VERSION = [1, 0, 0]
 
+
 def ensure_dir(p: str):
     os.makedirs(p, exist_ok=True)
+
 
 def write_json(path: str, data: dict):
     ensure_dir(os.path.dirname(path))
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
 
+
 print("Starting convert (Pack mode)")
 
-# Clean workspace
 for d in ("_work", "output_pack", "blueprints"):
     if os.path.exists(d):
         shutil.rmtree(d)
     os.makedirs(d, exist_ok=True)
 
-# Input zip (downloaded by workflow)
 bpfile = os.getenv("file")
 if not bpfile or not os.path.exists(bpfile):
     print("Blueprint zip not found")
@@ -43,13 +44,12 @@ if not bpfile or not os.path.exists(bpfile):
 
 with zipfile.ZipFile(bpfile, "r") as zf:
     zf.extractall("blueprints/")
+
 print("Blueprints extracted")
 
-# Pack root
 pack_root = "output_pack"
 ensure_dir(pack_root)
 
-# Create manifest.json
 manifest = {
     "format_version": 2,
     "header": {
@@ -67,12 +67,13 @@ manifest = {
         }
     ]
 }
+
 write_json(os.path.join(pack_root, "manifest.json"), manifest)
 
-# Output folders in pack
 geo_dir = os.path.join(pack_root, "models", "entity")
 anim_dir = os.path.join(pack_root, "animations")
 tex_dir = os.path.join(pack_root, "textures", "entity")
+
 ensure_dir(geo_dir)
 ensure_dir(anim_dir)
 ensure_dir(tex_dir)
@@ -85,16 +86,19 @@ for modelfile in glob.glob("blueprints/**/*.bbmodel", recursive=True):
     with open(modelfile, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    # Model name from path
-    name = os.path.splitext(modelfile)[0].replace("blueprints/", "").replace("\\", "/").replace("/", "_")
+    name = os.path.splitext(modelfile)[0] \
+        .replace("blueprints/", "") \
+        .replace("\\", "/") \
+        .replace("/", "_") \
+        .lower()
 
-    # Build texture atlas
     textures = {"width": 0, "height": 0, "data": {}}
     model_texture = None
 
     for slot, tex in enumerate(data.get("textures", [])):
         src = tex.get("source", "")
         tex_data = re.sub(r"^data:image/.+;base64,", "", src)
+
         img = Image.open(BytesIO(base64.b64decode(tex_data)))
 
         frame_time = int(tex.get("frame_time", 1) or 1)
@@ -102,13 +106,14 @@ for modelfile in glob.glob("blueprints/**/*.bbmodel", recursive=True):
             h = img.height // frame_time
             img = img.crop((0, 0, img.width, h))
 
-        textures["data"][str(slot)] = {"image": img, "position": textures["height"]}
+        textures["data"][str(slot)] = {"image": img}
         textures["width"] = max(textures["width"], img.width)
         textures["height"] += img.height
 
     if textures["data"]:
         model_texture = Image.new("RGBA", (textures["width"], textures["height"]))
         y = 0
+
         for t in textures["data"].values():
             model_texture.paste(t["image"], (0, y))
             y += t["image"].height
@@ -117,13 +122,13 @@ for modelfile in glob.glob("blueprints/**/*.bbmodel", recursive=True):
 
     texture = Texture(model_texture, textures) if model_texture else None
 
-    # Convert geometry + animation
     model = Model(data, texture, identifier=f"geometry.{name}").to_geometry_bedrock()
-    animations = Animation(data.get("animations", [])).to_bedrock()
-
-    # Write into pack structure
     write_json(os.path.join(geo_dir, f"{name}.geo.json"), model)
-    write_json(os.path.join(anim_dir, f"{name}.animation.json"), animations)
+
+    animations = data.get("animations", [])
+    if animations:
+        anim_exporter = Animation(animations, namespace=name)
+        anim_exporter.export(os.path.join(anim_dir, f"{name}.animation.json"))
 
     converted_any = True
 
@@ -131,7 +136,6 @@ if not converted_any:
     print("No .bbmodel found in zip")
     raise SystemExit(2)
 
-# Zip pack
 pack_zip = "Converted_Pack.mcpack"
 if os.path.exists(pack_zip):
     os.remove(pack_zip)
