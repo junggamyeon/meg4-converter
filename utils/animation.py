@@ -1,19 +1,18 @@
-import json
+from __future__ import annotations
 
 
 class Animation:
-
     def __init__(self, animations: list, namespace: str = "ancient") -> None:
         self.animations = animations or []
         self.namespace = namespace
 
     @staticmethod
-    def __bedrock_name(raw_name: str, namespace: str):
-        clean = raw_name.replace(" ", "_").lower()
-        return f"animation.{namespace}.{clean}"
+    def __bedrock_name(raw_name: str, namespace: str) -> str:
+        name = raw_name.replace(" ", "_").lower()
+        return f"animation.{namespace}.{name}"
 
     @staticmethod
-    def __loop_value(loop: str):
+    def __get_loop(loop: str):
         if loop == "loop":
             return True
         if loop == "once":
@@ -22,43 +21,91 @@ class Animation:
             return "hold_on_last_frame"
         return False
 
-    def export(self, path: str):
+    @staticmethod
+    def __vec3(dp: dict):
+        if not isinstance(dp, dict):
+            return None
+        if all(k in dp for k in ("x", "y", "z")):
+            return [float(dp["x"]), float(dp["y"]), float(dp["z"])]
+        return None
+
+    @staticmethod
+    def __animators_to_bones(animators: dict) -> dict:
+        out = {}
+        if not isinstance(animators, dict):
+            return out
+
+        for _, animator in animators.items():
+            if not isinstance(animator, dict):
+                continue
+
+            bone_name = animator.get("name") or animator.get("uuid") or "bone"
+            kfs = animator.get("keyframes") or []
+            if not isinstance(kfs, list):
+                continue
+
+            bone = out.setdefault(bone_name, {})
+
+            for kf in kfs:
+                if not isinstance(kf, dict):
+                    continue
+
+                channel = kf.get("channel")
+                t = kf.get("time")
+
+                if channel not in ("rotation", "position", "scale") or t is None:
+                    continue
+
+                dps = kf.get("data_points") or kf.get("dataPoints") or []
+                vec = None
+
+                if isinstance(dps, list) and dps:
+                    vec = Animation.__vec3(dps[0])
+
+                if vec is None:
+                    vec = Animation.__vec3(kf)
+
+                if vec is None:
+                    continue
+
+                ch = bone.setdefault(channel, {})
+                ch[str(float(t))] = vec
+
+        return out
+
+    def to_bedrock(self) -> dict:
         data = {
             "format_version": "1.8.0",
             "animations": {}
         }
 
         for anim in self.animations:
-            raw_name = anim.get("name", "unnamed")
-            bedrock_name = self.__bedrock_name(raw_name, self.namespace)
-
-            entry = {
-                "loop": self.__loop_value(anim.get("loop", "once")),
-                "bones": {}
-            }
-
-            # Giữ logic cũ: copy raw bone structure
-            for bone_name, bone_data in anim.get("bones", {}).items():
-                if not isinstance(bone_data, dict):
-                    continue
-
-                bone_entry = {}
-
-                for channel, timeline in bone_data.items():
-                    if channel not in ("rotation", "position", "scale"):
-                        continue
-
-                    if isinstance(timeline, dict) and timeline:
-                        bone_entry[channel] = timeline
-
-                if bone_entry:
-                    entry["bones"][bone_name] = bone_entry
-
-            # Nếu animation thật sự không có bone → bỏ qua animation này
-            if not entry["bones"]:
+            if not isinstance(anim, dict):
                 continue
 
-            data["animations"][bedrock_name] = entry
+            raw_name = anim.get("name") or "converted"
+            name = self.__bedrock_name(raw_name, self.namespace)
 
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
+            loop = self.__get_loop(anim.get("loop", "loop"))
+            length = anim.get("length", anim.get("animation_length"))
+            animators = anim.get("animators", {})
+
+            bones = self.__animators_to_bones(animators)
+            if not bones:
+                continue
+
+            entry = {
+                "loop": loop,
+                "bones": bones
+            }
+
+            if length is not None:
+                entry["animation_length"] = float(length)
+
+            for k in ("anim_time_update", "blend_weight", "start_delay", "loop_delay"):
+                if k in anim and anim[k] is not None:
+                    entry[k] = anim[k]
+
+            data["animations"][name] = entry
+
+        return data
