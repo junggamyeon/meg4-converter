@@ -4,7 +4,7 @@ if game.PlaceId ~= ALLOWED_PLACEID then
     warn("Wrong PlaceId, script stopped:", game.PlaceId)
     return
 end
-print("anh jung dz v20")
+print("anh jung dz v21")
 repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
 local Config = getgenv().Config
 local FeedConfig = Config["Auto Feed"] or {}
