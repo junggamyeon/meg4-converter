@@ -4,7 +4,7 @@ if game.PlaceId ~= ALLOWED_PLACEID then
     warn("Wrong PlaceId, script stopped:", game.PlaceId)
     return
 end
-print("anh jung dz v20")
+print("anh jung dz v25")
 repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
 local Config = getgenv().Config
 local FeedConfig = Config["Auto Feed"] or {}
@@ -944,47 +944,106 @@ local function autoDeleteStickers()
     end
 end
 
-local function LoadConfig()
-    local cfg = getgenv().Config
-    if not cfg or not cfg["Load Atlas Config"] then
-        return
-    end
+function AutoLoadConfig()
+    task.spawn(function()
+        local Players = game:GetService("Players")
+        local Http = game:GetService("HttpService")
+        local TeleportService = game:GetService("TeleportService")
+        local RS = game:GetService("ReplicatedStorage")
+        local Player = Players.LocalPlayer
 
-    local folder = "atlas"
-    local path = folder .. "/Preset 1.json"
+        local FOLDER = "atlas"
+        local PRESET_PATH = FOLDER .. "/Preset 1.json"
+        local STATE_PATH = FOLDER .. "/cfatlas.json"
 
-    local json = [[
-{"hive":{"mutas2":false,"beetypes":false,"rj":false,"feedtype":"Bitterberry","rjrarity":false,"stoprjgifted":false,"rjbeetypes":false,"amount":50,"giftedbasic":false,"mutations":false,"neonberry":false,"bee":false},"misc":{"bqbuy":false,"console":false,"bqbuyconf":false,"autossa2":false,"follow":false,"mvalues":[],"passive":"Pop Star","dapperslots":5,"automoon":false,"serverhop":false,"followfieldblacklist":false,"anonymous":false,"mboosts":[],"rolldouble":false,"passives2":false,"boosts":false,"mobiletoggle":true,"bqdel2":false,"custompatterns":false,"farmmultiplefields":false,"serverhopinterval":30,"autorejoin2":false,"bqdelconf":false},
-"combat":{"killLadybug":true,"values":[],"mondochick":false,"crabmethod":"Walk","killkingbeetle":false,"killcrab":false,"babylove":false,"donatevials":false,"wlstingers":false,"killScorpion":false,"killtunnelbear":false,"craboil":false,"giftedvicious":false,"killWerewolf":false,"windymax":25,"viciousmin":1,"killMantis":false,"demonmask":false,"lootmondo":false,"killRhinoBeetle":true,"boosts":[],"keep":false,"killSpider":false,"amulet":false,"windymin":1,"killcommando":false,"viciousmax":12,"stingers":false,"starsaw":false,"killwindy":false,"wlstarsaw":false,"avoidmobs":true,"commandomethod":"Walk","killvicious":false,"killAphid":true,"mondoprep":false,"dmwhitelist":false,"mondopreptime":20,"commandohelp":false,"commandoshell":true,"mondochicktime":15},
-"dispensers":{"coconut":false,"blueberry":false,"royaljelly":false,"treat":false,"strawberry":false,"robopass":false,"glue":false,"honey":false,"antpass":true},
-"autoquest":{"planters":false,"feedbees":true,"windshrine":false,"rileybee":false,"ragetokens":true,"gummybear":false,"buckobee":false,"treats":true,"enabled":true,"memorymatch":true,"onett":false,"beebear":false,"blackbear2":false,"pollen":true,"sciencebear":false,"puffshrooms":true,"goomethod":"Gumdrops","levelbees":true,"sharebeans":false,"pandabear":false,"bestwhitefield":"Sunflower Field","bestredfield":"Mushroom Field","toys":true,"dapperbear":false,"brownbear":false,"ants":false,"blackbear":true,"polarbear":false,"spiritbear":false,"mobs":true,"blooms":false,"rj":true,"honeybee":false,"motherbear":true,"craft":false,"bestbluefield":"Blue Flower Field","stickbug":false,"goo":true,"xmas":false,"dupedtokens":false,"allowedplanters":false,"rjbl":false,"claim2":{"Black Bear":true,"Mother Bear":true}},
-"face":{"balloons":false,"bubbles":false,"shiftlock":false,"gbubbles":false,"method":"Shift Lock","fires":false,"sldirection":"South","gballoons":false,"center":false},
-"convert":{"standInPreciseAt":75,"convertHiveBalloon":false,"instantType":false,"convertHoneyAt":100,"coconutAt":85,"convertHoney":true,"resetWhenConverting":false,"convert6xBubbleBloat":false,"festivegift":false,"autoHoneyMask":false,"alwaysConvertBalloon":false,"timeToWait":15,"coconut":false,"defaultMask":"Diamond Mask","standInPrecise":true,"useEnzymesBalloon":false,"convertField":false,"convertHiveBalloonAt":30,"waitBeforeConverting":false,"instantToggle":false},
-"boosters":{"min":1,"wanted":1,"required":false,"enabled2":false,"allowed":false,"fieldsblacklist":false},
-"vars":{"cannon":false,"sprinkler":"Basic Sprinkler","remote":true,"walkspeedenabled":true,"tweenspeed":12,"movement":"Tween","digmethod":"Remote","walkspeed":90,"jumpshortcuts":false,"walkspeed2":1.5,"walkdynamic":false},
-"sprouts":{"enabled":true,"plant":true,"plantday":false,"collect":true,"amount":7,"left":5,"plantnight":true,"rarity3":false,"fieldsblacklist":false},
-"stickbug":{"circle":true,"amulet":false,"totem":true,"boosts":[],"tickets":false,"keep":false,"loot":false,"values":[],"enabled":false,"spawn":false},
-"webhook":{"console":false,"disconnectid":"","interval":5,"url":"","graphurl":"","stickers":false,"enabled":false,"graph":false,"beequips":false,"drives":false,"hidebranding":false,"questdone2":false,"items":false,"disconnect":false,"planters":true,"nectars":true,"balloon":false,"dappershop":false},
-"memorymatch":{"ghost4":false,"night":false,"ghost2":false,"basic":false,"ghost":false,"mega":false,"extreme":false,"blacklist":false},
-"rbc":{"passcooldown":0,"values":[],"upgrades":false,"mask":false,"rerollquests":false,"redtool":"Dark Scythe","bluemask":"Diamond Mask","cogconvert":true,"cogupgrades":true,"rerollupgrades":false,"materialsenabled":false,"buypass":false,"whitemask":"Gummy Mask","preset":"Blue","disableroundend":false,"maskround":5,"stoproundend":false,"whitetool":"Gummyballer","highestcogmax":10,"maxround":15,"highestcog":false,"precise":false,"rerollbees":false,"boosts":[],"bestredfield":"Mushroom Field","bestbluefield":"Blue Flower Field","keep":true,"tool":false,"amulet":true,"bluetool":"Tide Popper","toolround":4,"redmask":"Demon Mask","goomethod":"Gumdrops","bestwhitefield":"Sunflower Field","usedrives":{"Glitched":true,"Red":true,"Blue":true,"White":true},"buydrives":{"Glitched":true,"Red":true,"Blue":true,"White":true},"materials":false,"rerollmin":10,"upgradesenabled":false,"goldcogmowers":true,"enabled":false,"precisemin":5},
-"beesmas":{"candles":false,"snowmachine":false,"snowflakeAt":95,"beesmasfeast":false,"snowflake":false,"honeymaskforwreath":false,"gingerbreadhouse":false,"partyspawn":false,"samovar":false,"roboparty":false,"partymobsbl2":false,"stockings":false,"coolbreeze":false,"wintermm":false,"onettlidart":false,"snowbear":false},
-"toys":{"windshrine":false,"conversions":2,"stickerprinter":true,"stackselect":false,"sproutsummoner":false,"meteor":false,"honeystorm":false,"discardselect":false,"stickerstacker":false,"intwhitelist":false,"enabled":true,"wealthclock":false,"route":false,"hiddenstickers":true,"interrupt":true,"discardstickers":false,"shrineamount":1,"printereggs":{"Star Egg":true},"stackmethod":"Tickets","windsblacklist":false,"farmwinds":false,"nectarcondenser":false,"prog":true,"nectars":false,"progblender":true,"shrineitem":""},
-"detected":{"rares":false,"fastcoconuttween":false,"fastshowertween":false,"fastraretween":false},
-"snail":{"enabled":false,"keep":false,"amulet":false,"boosts":[],"values":[]},
-"materials":{"enabled":[],"starsaw":false,"scorchingstar":[],"enabled2":false,"interval":[],"gummystar":[],"intervaltime":{"BlueExtract":15},"popstar":[]},
-"puffshrooms":{"enabled":true,"rarity":"Common","max":3,"maintain":false,"highlvlpriority":false,"mintime":30,"min":1,"blacklistedfields":false,"priorityfields":false},
-"planters":{"manual":{"farmfield":false,"planter3":{"harvestatpercentage":true,"plant":false,"ignoresmoking":false,"lastfield":false,"field2":"None","field1":"Dandelion Field","field4":"None","harvestat":100,"planter":"Plastic Planter","timetoharvest":4,"field3":"None","harvestaftertime":false,"harvest":false},"planter2":{"harvestatpercentage":true,"plant":false,"ignoresmoking":false,"lastfield":false,"field2":"None","field1":"Dandelion Field","field4":"None","harvestat":100,"planter":"Plastic Planter","timetoharvest":4,"field3":"None","harvestaftertime":false,"harvest":false},"planter1":{"harvestatpercentage":true,"plant":false,"ignoresmoking":false,"lastfield":false,"field2":"None","field1":"Dandelion Field","field4":"None","harvestat":100,"planter":"Plastic Planter","timetoharvest":4,"field3":"None","harvestaftertime":false,"harvest":false}},"method":"Manual","cycles":{"cycle1":{"planter1":{"field":"Dandelion Field","planter":"None"},"planter2":{"field":"Dandelion Field","planter":"None"},"planter3":{"field":"Dandelion Field","planter":"None"},"timetoharvest":2,"harvestat":100,"ignoresmoking":false,"harvestatpercentage":true,"harvestaftertime":false}},"enabled":false},
-"antilag":{"textures":true,"precise":true,"flowers":true,"main":true,"bssui":false,"players":false,"norender":false,"tokens":true,"decorations":true,"bees":true,"stations":true,"particles":true,"balloons":true}
-}
-]]
+        local BEFORE_URL = "https://raw.githubusercontent.com/Overdex-Community/Loader/refs/heads/main/before.txt"
+        local AFTER_URL  = "https://raw.githubusercontent.com/Overdex-Community/Loader/refs/heads/main/after.txt"
 
-    if not isfolder(folder) then
-        makefolder(folder)
-    end
+        local CHECK_DELAY = 10
+        local HOP_CD = 25
+        local lastHop = 0
 
-    writefile(path, json)
+        local function isEnabled()
+            local cfg = getgenv().Config
+            return cfg and cfg["Load Config Atlas"] == true
+        end
+
+        local function hop(reason)
+            if tick() - lastHop < HOP_CD then return end
+            lastHop = tick()
+            print("[AutoLoadConfig] HOP |", reason)
+            pcall(function()
+                TeleportService:TeleportToPlaceInstance(
+                    game.PlaceId,
+                    game.JobId,
+                    Player
+                )
+            end)
+        end
+
+        local function decode(str)
+            local ok, data = pcall(function()
+                return Http:JSONDecode(str)
+            end)
+            return ok and data or {}
+        end
+
+        if not isfolder(FOLDER) then
+            makefolder(FOLDER)
+        end
+
+        while task.wait(CHECK_DELAY) do
+            if not isEnabled() then break end
+
+            local hasStarEgg = false
+            pcall(function()
+                local cache = require(RS.ClientStatCache):Get()
+                hasStarEgg = cache and cache.Eggs and tonumber(cache.Eggs.Star) > 0
+            end)
+
+            local canTrade = false
+            local tc = Player:FindFirstChild("TradeConfig")
+            if tc and tc:FindFirstChild("CanTrade") then
+                canTrade = tc.CanTrade.Value
+            end
+
+            local conditionMet = hasStarEgg and not canTrade
+
+            local state = isfile(STATE_PATH) and decode(readfile(STATE_PATH)) or {}
+            state[Player.Name] = state[Player.Name] or {
+                Condition = false,
+                Hop = false
+            }
+
+            local user = state[Player.Name]
+
+            if not conditionMet then
+                if not user.Hop then
+                    local raw = game:HttpGet(BEFORE_URL)
+                    writefile(PRESET_PATH, raw)
+                    user.Hop = true
+                    state[Player.Name] = user
+                    writefile(STATE_PATH, Http:JSONEncode(state))
+                    hop("before_condition")
+                end
+            else
+                if not user.Condition then
+                    local raw = game:HttpGet(AFTER_URL)
+                    writefile(PRESET_PATH, raw)
+                    user.Condition = true
+                    user.Hop = true
+                    state[Player.Name] = user
+                    writefile(STATE_PATH, Http:JSONEncode(state))
+                    hop("after_condition")
+                end
+            end
+
+            break
+        end
+    end)
 end
-LoadConfig()
+
+AutoLoadConfig()
 task.spawn(function()
     while task.wait(3) do
         autoClaimStickers()
