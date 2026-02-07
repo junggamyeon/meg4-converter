@@ -385,144 +385,129 @@ local function autoFeed()
     if not cache then return end
 
     local completed = deepFind(cache, "Completed") or {}
-    local currentQuest = getCurrentQuest(completed)
+    local targetLevel = FeedConfig["Bee Level"] or 7
+    local maxCount = FeedConfig["Bee Amount"] or 7
+    local bees = getBees()
 
-    if not currentQuest then
+    if countReached(bees, targetLevel) >= maxCount then
+        print("[AutoFeed] Đã đủ", maxCount, "ong đạt level", targetLevel)
         FEED_DONE = true
         return
     end
 
-    local isFinalQuest = (currentQuest == "Seven To Seven")
-    local reserveTreat, reserveFruits = getGlobalReserve(completed)
+    FEED_TARGETS = FEED_TARGETS or {}
 
-    local bees = getBees()
     table.sort(bees, function(a, b)
+        return a.level > b.level
+    end)
+
+    local function isInTargets(b)
+        for _, t in ipairs(FEED_TARGETS) do
+            if t.col == b.col and t.row == b.row then
+                return true
+            end
+        end
+        return false
+    end
+
+    if #FEED_TARGETS < maxCount then
+        for _, b in ipairs(bees) do
+            if b.level < targetLevel and not isInTargets(b) then
+                FEED_TARGETS[#FEED_TARGETS + 1] = b
+                if #FEED_TARGETS >= maxCount then break end
+            end
+        end
+    end
+
+    if #FEED_TARGETS == 0 then
+        print("[AutoFeed] Không có ong cần feed")
+        FEED_DONE = true
+        return
+    end
+
+    table.sort(FEED_TARGETS, function(a, b)
         return a.level < b.level
     end)
 
-    local maxCount = FeedConfig["Bee Amount"] or 7
-    local targetLevel = FeedConfig["Bee Level"] or 7
+    local currentQuest = getCurrentQuest(completed)
+    local isFinalQuest = (currentQuest == "Seven To Seven" or currentQuest == "Picking Out Pineapples")
+    local reserveTreat, reserveFruits = getGlobalReserve(completed)
+    local inventory = getInventory()
 
-    -- LOCK TARGETS 1 LẦN
-    if not FEED_TARGETS then
-        FEED_TARGETS = {}
-        for _, b in ipairs(bees) do
-            if b.level < targetLevel then
-                FEED_TARGETS[#FEED_TARGETS + 1] = b
-                if #FEED_TARGETS >= maxCount then
-                    break
-                end
+    local target = FEED_TARGETS[1]
+    local bondLeft = getBondLeft(target.col, target.row)
+    if not bondLeft or bondLeft <= 0 then return end
+
+    local remaining = bondLeft
+
+    for _, item in ipairs(BOND_ITEMS) do
+        if remaining <= 0 then break end
+        if FeedConfig["Bee Food"] and FeedConfig["Bee Food"][item.Name] then
+            local keep = 0
+            if not isFinalQuest then
+                if item.Name == "Treat" then keep = reserveTreat end
+                if reserveFruits[item.Name] then keep = reserveFruits[item.Name] end
             end
-        end
 
-        if #FEED_TARGETS == 0 then
-            print("[AutoFeed] Không có ong cần feed")
-            FEED_DONE = true
-            return
-        end
-
-        print("[AutoFeed] Lock", #FEED_TARGETS, "bees để feed tới level", targetLevel)
-    end
-
-    local finished = 0
-
-    for _, b in ipairs(FEED_TARGETS) do
-        local bondLeft = getBondLeft(b.col, b.row)
-
-        if not bondLeft or bondLeft <= 0 then
-            finished += 1
-            continue
-        end
-
-        local remaining = bondLeft
-        local inventory = getInventory()
-        local fedSomething = false
-
-        for _, item in ipairs(BOND_ITEMS) do
-            if remaining <= 0 then break end
-            if FeedConfig["Bee Food"] and FeedConfig["Bee Food"][item.Name] then
-                local keep = 0
-
-                if not isFinalQuest then
-                    if item.Name == "Treat" then
-                        keep = reserveTreat
-                    end
-                    if reserveFruits[item.Name] then
-                        keep = reserveFruits[item.Name]
-                    end
-                end
-
-                local have = (inventory[item.Name] or 0) - keep
-                if have > 0 then
-                    local need = math.ceil(remaining / item.Value)
-                    local use = math.min(have, need)
-
-                    if use > 0 then
-                        local keyName = ITEM_KEYS[item.Name]
-                        local bondGain = use * item.Value
-
-                        print(
-                            "[AutoFeed] Bee[" .. b.col .. "," .. b.row .. "]" ..
-                            " | Lv " .. b.level ..
-                            " -> " .. targetLevel ..
-                            " | Item " .. item.Name ..
-                            " | Use " .. use ..
-                            " | Bond +" .. bondGain
-                        )
-
-                        Events.ConstructHiveCellFromEgg:InvokeServer(
-                            b.col,
-                            b.row,
-                            keyName,
-                            use,
-                            false
-                        )
-
-                        remaining -= bondGain
-                        fedSomething = true
-                        task.wait(2)
-                        return -- mỗi tick feed 1 lần
-                    end
-                end
-            end
-        end
-
-        -- ===== KHÔNG FEED ĐƯỢC ITEM → MUA TREAT =====
-        if not fedSomething and FeedConfig["Auto Buy Treat"] then
-            local haveTreat = inventory["Treat"] or 0
-            local freeTreat = haveTreat - reserveTreat
-            local needTreat = math.max(0, math.ceil(remaining / 10) - freeTreat)
-
-            if needTreat > 0 then
-                local honey = Player.CoreStats.Honey.Value
-                local cost = needTreat * 10000
-
-                if honey >= cost then
+            local have = (inventory[item.Name] or 0) - keep
+            if have > 0 then
+                local need = math.ceil(remaining / item.Value)
+                local use = math.min(have, need)
+                if use > 0 then
                     print(
-                        "[AutoFeed] BUY Treat | Need " .. needTreat ..
-                        " | Cost " .. cost ..
-                        " | Honey " .. honey
+                        "[AutoFeed] Bee[" .. target.col .. "," .. target.row .. "]" ..
+                        " | Lv " .. target.level ..
+                        " -> " .. targetLevel ..
+                        " | Item " .. item.Name ..
+                        " | Use " .. use
                     )
 
-                    Events.ItemPackageEvent:InvokeServer("Purchase", {
-                        Type = "Treat",
-                        Amount = needTreat,
-                        Category = "Eggs"
-                    })
+                    Events.ConstructHiveCellFromEgg:InvokeServer(
+                        target.col,
+                        target.row,
+                        ITEM_KEYS[item.Name],
+                        use,
+                        false
+                    )
 
-                    task.wait(1.5)
+                    task.wait(2)
                     return
-                else
-                    print("[AutoFeed] Not enough honey to buy Treat")
                 end
             end
         end
     end
 
-    -- DONE ALL TARGETS
-    if finished >= #FEED_TARGETS then
-        print("[AutoFeed] DONE: Đã feed đủ", #FEED_TARGETS, "ong tới level", targetLevel)
-        FEED_DONE = true
+    if FeedConfig["Auto Buy Treat"] then
+        local honey = Player.CoreStats.Honey.Value
+
+        if isFinalQuest then
+            local maxBuy = math.floor(honey / 10000)
+            if maxBuy > 0 then
+                print("[AutoFeed] BUY Treat (FULL):", maxBuy)
+                Events.ItemPackageEvent:InvokeServer("Purchase", {
+                    Type = "Treat",
+                    Amount = maxBuy,
+                    Category = "Eggs"
+                })
+                task.wait(1.5)
+                return
+            end
+        else
+            local freeTreat = (inventory["Treat"] or 0) - reserveTreat
+            local needTreat = math.max(0, math.ceil(remaining / 10) - freeTreat)
+            local cost = needTreat * 10000
+
+            if needTreat > 0 and honey >= cost then
+                print("[AutoFeed] BUY Treat:", needTreat)
+                Events.ItemPackageEvent:InvokeServer("Purchase", {
+                    Type = "Treat",
+                    Amount = needTreat,
+                    Category = "Eggs"
+                })
+                task.wait(1.5)
+                return
+            end
+        end
     end
 end
 local function autoHatch()
@@ -588,6 +573,28 @@ local function autoPrinter()
             { name = "Account Age", value = Player.AccountAge .. " days", inline = true },
             { name = "In Group", value = tostring(inGroup), inline = true }
         }, 16777215)
+    end
+end
+
+local function checkQuest()
+    if QUEST_DONE or getgenv().Config["Check Quest"] == false then return end
+
+    local cache = getCache()
+    if not cache then return end
+
+    local completed = deepFind(cache, "Completed")
+    if not completed then return end
+
+    for _, q in pairs(completed) do
+        if tostring(q) == "Seven To Seven" then
+            sendWebhook("Quest Seven To Seven done!!!!!", {
+                { name = "Player", value = Player.Name, inline = false },
+                { name = "Bee Count", value = tostring(#getBees()), inline = false }
+            }, 16776960)
+
+            QUEST_DONE = true
+            return
+        end
     end
 end
 
