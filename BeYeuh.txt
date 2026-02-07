@@ -956,100 +956,46 @@ function AutoLoadConfig()
         local Players = game:GetService("Players")
         local Http = game:GetService("HttpService")
         local TeleportService = game:GetService("TeleportService")
-        local RS = game:GetService("ReplicatedStorage")
         local Player = Players.LocalPlayer
 
         local FOLDER = "atlas"
         local PRESET_PATH = FOLDER .. "/Preset 1.json"
-        local STATE_PATH = FOLDER .. "/cfatlas.json"
-
+        local STATE_PATH = FOLDER .. "/cfaas.json"
         local BEFORE_URL = "https://raw.githubusercontent.com/Overdex-Community/Loader/refs/heads/main/before.txt"
-        local AFTER_URL  = "https://raw.githubusercontent.com/Overdex-Community/Loader/refs/heads/main/after.txt"
-
-        local CHECK_DELAY = 10
-        local HOP_CD = 25
-        local lastHop = 0
-
-        local function isEnabled()
-            local cfg = getgenv().Config
-            return cfg and cfg["Load Config Atlas"] == true
-        end
-
-        local function hop(reason)
-            if tick() - lastHop < HOP_CD then return end
-            lastHop = tick()
-            print("[AutoLoadConfig] HOP |", reason)
-            pcall(function()
-                TeleportService:TeleportToPlaceInstance(
-                    game.PlaceId,
-                    game.JobId,
-                    Player
-                )
-            end)
-        end
-
-        local function decode(str)
-            local ok, data = pcall(function()
-                return Http:JSONDecode(str)
-            end)
-            return ok and data or {}
-        end
 
         if not isfolder(FOLDER) then
             makefolder(FOLDER)
         end
 
-        while task.wait(CHECK_DELAY) do
-            if not isEnabled() then break end
-
-            local hasStarEgg = false
-            pcall(function()
-                local cache = require(RS.ClientStatCache):Get()
-                hasStarEgg = cache and cache.Eggs and tonumber(cache.Eggs.Star) > 0
+        local state = {}
+        if isfile(STATE_PATH) then
+            local ok, data = pcall(function()
+                return Http:JSONDecode(readfile(STATE_PATH))
             end)
-
-            local canTrade = false
-            local tc = Player:FindFirstChild("TradeConfig")
-            if tc and tc:FindFirstChild("CanTrade") then
-                canTrade = tc.CanTrade.Value
+            if ok and type(data) == "table" then
+                state = data
             end
-
-            local conditionMet = hasStarEgg and not canTrade
-
-            local state = isfile(STATE_PATH) and decode(readfile(STATE_PATH)) or {}
-            state[Player.Name] = state[Player.Name] or {
-                Condition = false,
-                Hop = false
-            }
-
-            local user = state[Player.Name]
-
-            if not conditionMet then
-                if not user.Hop then
-                    local raw = game:HttpGet(BEFORE_URL)
-                    writefile(PRESET_PATH, raw)
-                    user.Hop = true
-                    state[Player.Name] = user
-                    writefile(STATE_PATH, Http:JSONEncode(state))
-                    hop("before_condition")
-                end
-            else
-                if not user.Condition then
-                    local raw = game:HttpGet(AFTER_URL)
-                    writefile(PRESET_PATH, raw)
-                    user.Condition = true
-                    user.Hop = true
-                    state[Player.Name] = user
-                    writefile(STATE_PATH, Http:JSONEncode(state))
-                    hop("after_condition")
-                end
-            end
-
-            break
         end
+
+        if state[Player.Name] then
+            return
+        end
+
+        local raw = game:HttpGet(BEFORE_URL)
+        writefile(PRESET_PATH, raw)
+
+        state[Player.Name] = true
+        writefile(STATE_PATH, Http:JSONEncode(state))
+
+        pcall(function()
+            TeleportService:TeleportToPlaceInstance(
+                game.PlaceId,
+                game.JobId,
+                Player
+            )
+        end)
     end)
 end
-
 AutoLoadConfig()
 task.spawn(function()
     while task.wait(3) do
