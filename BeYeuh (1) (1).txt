@@ -4,6 +4,11 @@ if game.PlaceId ~= ALLOWED_PLACEID then
     warn("Wrong PlaceId, script stopped:", game.PlaceId)
     return
 end
+game:GetService("StarterGui"):SetCore("SendNotification", {
+    Title = "Thông báo",
+    Text = "[Overdex] - Load script v26",
+    Duration = 5
+})
 print("anh jung dz v26")
 repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
 local Config = getgenv().Config
