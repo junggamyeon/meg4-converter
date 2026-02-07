@@ -1117,7 +1117,8 @@ function AutoLoadConfig()
         local Player = Players.LocalPlayer
 
         local FOLDER = "atlas"
-        local PATH = FOLDER .. "/Preset 1.json"
+        local PRESET_PATH = FOLDER .. "/Preset 1.json"
+        local STATE_PATH = FOLDER .. "/cfatlas.json"
 
         local BEFORE_URL = "https://raw.githubusercontent.com/Overdex-Community/Loader/refs/heads/main/before.txt"
         local AFTER_URL  = "https://raw.githubusercontent.com/Overdex-Community/Loader/refs/heads/main/after.txt"
@@ -1126,28 +1127,15 @@ function AutoLoadConfig()
         local HOP_CD = 25
         local lastHop = 0
 
-        local function log(...)
-            print("[AutoLoadConfig]", ...)
-        end
-
         local function isEnabled()
             local cfg = getgenv().Config
             return cfg and cfg["Load Config Atlas"] == true
         end
 
-        local function tryHop(reason)
-            if not isEnabled() then
-                log("Hop blocked (disabled)")
-                return
-            end
-
-            if tick() - lastHop < HOP_CD then
-                return
-            end
-
+        local function hop(reason)
+            if tick() - lastHop < HOP_CD then return end
             lastHop = tick()
-            log("HOP | reason =", reason)
-
+            print("[AutoLoadConfig] HOP |", reason)
             pcall(function()
                 TeleportService:TeleportToPlaceInstance(
                     game.PlaceId,
@@ -1157,53 +1145,24 @@ function AutoLoadConfig()
             end)
         end
 
-        local function safeDecode(str)
+        local function decode(str)
             local ok, data = pcall(function()
                 return Http:JSONDecode(str)
             end)
-            return ok and data or nil
+            return ok and data or {}
         end
 
-        local function matchRawOnly(raw, localCfg)
-            for k, v in pairs(raw) do
-                if localCfg[k] == nil then
-                    return false
-                end
-
-                if type(v) ~= type(localCfg[k]) then
-                    return false
-                end
-
-                if type(v) == "table" then
-                    if not matchRawOnly(v, localCfg[k]) then
-                        return false
-                    end
-                else
-                    if localCfg[k] ~= v then
-                        return false
-                    end
-                end
-            end
-            return true
+        if not isfolder(FOLDER) then
+            makefolder(FOLDER)
         end
 
         while task.wait(CHECK_DELAY) do
-            if not isEnabled() then
-                log("AutoLoadConfig disabled → loop stopped")
-                break
-            end
-
-            if not isfolder(FOLDER) then
-                makefolder(FOLDER)
-                log("Folder created")
-            end
+            if not isEnabled() then break end
 
             local hasStarEgg = false
             pcall(function()
                 local cache = require(RS.ClientStatCache):Get()
-                if cache and cache.Eggs and tonumber(cache.Eggs.Star) > 0 then
-                    hasStarEgg = true
-                end
+                hasStarEgg = cache and cache.Eggs and tonumber(cache.Eggs.Star) > 0
             end)
 
             local canTrade = false
@@ -1212,47 +1171,42 @@ function AutoLoadConfig()
                 canTrade = tc.CanTrade.Value
             end
 
-            local url = (hasStarEgg and not canTrade) and AFTER_URL or BEFORE_URL
-            log("Using URL =", url == AFTER_URL and "AFTER" or "BEFORE")
+            local conditionMet = hasStarEgg and not canTrade
 
-            local ok, rawText = pcall(function()
-                return game:HttpGet(url)
-            end)
+            local state = isfile(STATE_PATH) and decode(readfile(STATE_PATH)) or {}
+            state[Player.Name] = state[Player.Name] or {
+                Condition = false,
+                Hop = false
+            }
 
-            if not ok then
-                tryHop("http_failed")
-                break
+            local user = state[Player.Name]
+
+            if not conditionMet then
+                if not user.Hop then
+                    local raw = game:HttpGet(BEFORE_URL)
+                    writefile(PRESET_PATH, raw)
+                    user.Hop = true
+                    state[Player.Name] = user
+                    writefile(STATE_PATH, Http:JSONEncode(state))
+                    hop("before_condition")
+                end
+            else
+                if not user.Condition then
+                    local raw = game:HttpGet(AFTER_URL)
+                    writefile(PRESET_PATH, raw)
+                    user.Condition = true
+                    user.Hop = true
+                    state[Player.Name] = user
+                    writefile(STATE_PATH, Http:JSONEncode(state))
+                    hop("after_condition")
+                end
             end
 
-            local rawCfg = safeDecode(rawText)
-            if not rawCfg then
-                tryHop("raw_decode_fail")
-                break
-            end
-
-            local localCfg
-            if isfile(PATH) then
-                localCfg = safeDecode(readfile(PATH))
-            end
-
-            if not localCfg then
-                log("No local config → write & hop")
-                writefile(PATH, Http:JSONEncode(rawCfg))
-                tryHop("no_local_config")
-                break
-            end
-
-            if not matchRawOnly(rawCfg, localCfg) then
-                log("Config mismatch (raw vs local) → overwrite & hop")
-                writefile(PATH, Http:JSONEncode(rawCfg))
-                tryHop("config_mismatch")
-                break
-            end
-
-            log("Config OK – no hop")
+            break
         end
     end)
 end
+
 AutoLoadConfig()
 task.spawn(function()
     while true do
