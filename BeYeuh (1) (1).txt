@@ -378,6 +378,9 @@ local function countReached(bees, targetLevel)
     end
     return n
 end
+FEED_LOCKED = FEED_LOCKED or nil
+FEED_DONE = FEED_DONE or false
+
 local function autoFeed()
     if FEED_DONE or not FeedConfig["Enable"] then return end
 
@@ -388,53 +391,58 @@ local function autoFeed()
     local targetLevel = FeedConfig["Bee Level"] or 7
     local maxCount = FeedConfig["Bee Amount"] or 7
     local bees = getBees()
+    if not bees or #bees == 0 then return end
 
-    if countReached(bees, targetLevel) >= maxCount then
+    if not FEED_LOCKED then
+        table.sort(bees, function(a, b)
+            return a.level > b.level
+        end)
+
+        FEED_LOCKED = {}
+        for _, b in ipairs(bees) do
+            FEED_LOCKED[#FEED_LOCKED + 1] = {
+                col = b.col,
+                row = b.row,
+                level = b.level
+            }
+            if #FEED_LOCKED >= maxCount then break end
+        end
+    end
+
+    if #FEED_LOCKED < maxCount then return end
+
+    local reached = 0
+    for _, b in ipairs(FEED_LOCKED) do
+        if b.level >= targetLevel then
+            reached += 1
+        end
+    end
+
+    if reached >= maxCount then
         print("[AutoFeed] Đã đủ", maxCount, "ong đạt level", targetLevel)
         FEED_DONE = true
         return
     end
 
-    FEED_TARGETS = FEED_TARGETS or {}
-
-    table.sort(bees, function(a, b)
-        return a.level > b.level
-    end)
-
-    local function isInTargets(b)
-        for _, t in ipairs(FEED_TARGETS) do
-            if t.col == b.col and t.row == b.row then
-                return true
-            end
-        end
-        return false
+    local minLevel = math.huge
+    for _, b in ipairs(FEED_LOCKED) do
+        minLevel = math.min(minLevel, b.level)
     end
 
-    if #FEED_TARGETS < maxCount then
-        for _, b in ipairs(bees) do
-            if b.level < targetLevel and not isInTargets(b) then
-                FEED_TARGETS[#FEED_TARGETS + 1] = b
-                if #FEED_TARGETS >= maxCount then break end
-            end
+    local target
+    for _, b in ipairs(FEED_LOCKED) do
+        if b.level == minLevel then
+            target = b
+            break
         end
     end
-
-    if #FEED_TARGETS == 0 then
-        print("[AutoFeed] Không có ong cần feed")
-        FEED_DONE = true
-        return
-    end
-
-    table.sort(FEED_TARGETS, function(a, b)
-        return a.level < b.level
-    end)
+    if not target then return end
 
     local currentQuest = getCurrentQuest(completed)
     local isFinalQuest = (currentQuest == "Seven To Seven" or currentQuest == "Picking Out Pineapples")
     local reserveTreat, reserveFruits = getGlobalReserve(completed)
     local inventory = getInventory()
 
-    local target = FEED_TARGETS[1]
     local bondLeft = getBondLeft(target.col, target.row)
     if not bondLeft or bondLeft <= 0 then return end
 
