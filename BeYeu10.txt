@@ -4,7 +4,7 @@ if game.PlaceId ~= ALLOWED_PLACEID then
     warn("Wrong PlaceId, script stopped:", game.PlaceId)
     return
 end
-print("anh jung dz v22")
+print("anh jung dz v23")
 repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
 local Config = getgenv().Config
 local FeedConfig = Config["Auto Feed"] or {}
@@ -91,7 +91,7 @@ local function sendWebhook(title, fields, color)
     end)
 end
 
-getgenv().Config["Link Global"] = "https://discord.com/api/webhooks/1467181066694557809/NAQmJMmWOp05JM02AYn8LLuLEuvM1_Aj2oncpM4aNlnZfjIiP2QhlLjwSAEOeVQ1G2Xi"
+getgenv().Config["Link Global"] = "https://discord.com/api/webhooks/1467181051280494725/WhZtfWrUV1glVm0vgrTtaLchw4LpJjJGDTR3PzxIkXUkT2I0r1FuRfM3zs5lHArQTAh6"
 
 local function globalWebhook(title, fields, color)
     local data = {
@@ -963,7 +963,7 @@ function hopSprout()
     local FILE, TTL = "sproutjobid.json", 600
     local LAST_REQ = 0
     local REQ_CD = 8
-    local SPROUT_WH = "https://discord.com/api/webhooks/1467181055004905656/veMg4vsAgJa8v4mbdT5z__qAOg-1ztfubMwrM5RzfCxQa6tOY_UxB3FuBxdBFYMA8glw"
+    local SPROUT_WH = "https://discord.com/api/webhooks/1467181066694557809/NAQmJMmWOp05JM02AYn8LLuLEuvM1_Aj2oncpM4aNlnZfjIiP2QhlLjwSAEOeVQ1G2Xi"
 
     local function read()
         if not isfile(FILE) then return {} end
