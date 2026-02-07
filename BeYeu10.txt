@@ -4,7 +4,7 @@ if game.PlaceId ~= ALLOWED_PLACEID then
     warn("Wrong PlaceId, script stopped:", game.PlaceId)
     return
 end
-print("anh jung dz v23")
+print("anh jung dz v24")
 repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
 local Config = getgenv().Config
 local FeedConfig = Config["Auto Feed"] or {}
@@ -938,10 +938,7 @@ function hopSprout()
         ["Field Name"] = {}
     }
     local cfg = getgenv().Config["Field Accept"]
-
-    if not cfg.Enable then
-        return
-    end
+    if not cfg.Enable then return end
 
     local function questDone()
         if not getCache or not deepFind then return false end
@@ -955,14 +952,10 @@ function hopSprout()
         end
         return false
     end
-
-    if not questDone() then
-        return
-    end
+    if not questDone() then return end
 
     local FILE, TTL = "sproutjobid.json", 600
-    local LAST_REQ = 0
-    local REQ_CD = 8
+    local LAST_REQ, REQ_CD = 0, 8
     local SPROUT_WH = "https://discord.com/api/webhooks/1467181066694557809/NAQmJMmWOp05JM02AYn8LLuLEuvM1_Aj2oncpM4aNlnZfjIiP2QhlLjwSAEOeVQ1G2Xi"
 
     local function read()
@@ -1016,9 +1009,7 @@ function hopSprout()
     local function sproutWebhook(field)
         if not SPROUT_WH or SPROUT_WH == "" then return end
         local job = game.JobId
-        local tpCode =
-            'game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId,"' ..
-            job .. '",game.Players.LocalPlayer)'
+        local tpCode = 'game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId,"' .. job .. '",game.Players.LocalPlayer)'
         local data = {
             embeds = {{
                 title = "🌱 Sprout Found!",
@@ -1047,36 +1038,23 @@ function hopSprout()
         end
         LAST_REQ = tick()
         local url = "https://games.roblox.com/v1/games/" .. PID .. "/servers/Public?sortOrder=Asc&limit=100"
-        if cursor then
-            url = url .. "&cursor=" .. cursor
-        end
+        if cursor then url = url .. "&cursor=" .. cursor end
         local ok, data = pcall(function()
             return Http:JSONDecode(game:HttpGet(url))
         end)
-        if not ok then
-            task.wait(15)
-            return nil
-        end
+        if not ok then task.wait(15) return nil end
         return data
     end
 
     local function hop()
         saveJob()
         local used = read()
-        local cursor = nil
-        local tries = 0
-        while tries < 300 do
+        local cursor
+        while true do
             local page = getServers(cursor)
-            if not page then
-                tries += 1
-                task.wait(2)
-            else
+            if page then
                 for _, s in pairs(page.data or {}) do
-                    if s.playing > 0
-                    and s.playing < s.maxPlayers
-                    and not used[s.id]
-                    and not s.privateServerId
-                    and (not s.access or s.access == "Public") then
+                    if s.playing > 0 and s.playing < s.maxPlayers and not used[s.id] and not s.privateServerId then
                         used[s.id] = { Time = os.time() }
                         write(used)
                         TP:TeleportToPlaceInstance(PID, s.id, Player)
@@ -1085,7 +1063,9 @@ function hopSprout()
                     end
                 end
                 cursor = page.nextPageCursor
-                if not cursor then break end
+                if not cursor then return end
+            else
+                task.wait(2)
             end
         end
     end
@@ -1099,14 +1079,27 @@ function hopSprout()
     end
 
     local field = findField(sprout.Position)
-
-    if allowed(field) then
-        sproutWebhook(field)
-        sprout.AncestryChanged:Wait()
+    if not allowed(field) then
         hop()
-    else
-        hop()
+        return
     end
+
+    sproutWebhook(field)
+
+    local destroyed = false
+    local conn
+    conn = sprout.AncestryChanged:Connect(function(_, parent)
+        if not parent then
+            destroyed = true
+            conn:Disconnect()
+        end
+    end)
+
+    repeat task.wait(1) until destroyed
+
+    if isfile(FILE) then delfile(FILE) end
+    task.wait(40)
+    hop()
 end
 function AutoLoadConfig()
     task.spawn(function()
