@@ -965,6 +965,10 @@ local function autoDeleteStickers()
 end
 
 function AutoLoadConfig()
+    if not getgenv().Config
+        or getgenv().Config["Load Config Atlas"] ~= true then
+        return
+    end
     task.spawn(function()
         local Players = game:GetService("Players")
         local Http = game:GetService("HttpService")
@@ -1018,7 +1022,7 @@ function fixFreezeBalo()
 
         local FOLDER = "atlas"
         local PRESET_PATH = FOLDER .. "/Preset 1.json"
-        local STATE_PATH = FOLDER .. "/cfaas.json"
+        local STATE_PATH = FOLDER .. "/cf.json"
         local BEFORE_URL = "https://raw.githubusercontent.com/Overdex-Community/Loader/refs/heads/main/before.txt"
 
         local CHECK_TIME = 600
