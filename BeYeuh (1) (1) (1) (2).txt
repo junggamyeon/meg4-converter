@@ -6,7 +6,7 @@ if game.PlaceId ~= ALLOWED_PLACEID then
 end
 game:GetService("StarterGui"):SetCore("SendNotification", {
     Title = "Thông báo",
-    Text = "[Overdex] - Load script v26",
+    Text = "[Overdex] - Load script v27",
     Duration = 5
 })
 print("anh jung dz v26")
@@ -1058,7 +1058,6 @@ function fixFreezeBalo()
         end
     end)
 end
-fixFreezeBalo()
 AutoLoadConfig()
 task.spawn(function()
     while task.wait(3) do
