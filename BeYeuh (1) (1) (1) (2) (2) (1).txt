@@ -6,10 +6,9 @@ if game.PlaceId ~= ALLOWED_PLACEID then
 end
 game:GetService("StarterGui"):SetCore("SendNotification", {
     Title = "Thông báo",
-    Text = "[Overdex] - Load script v27",
+    Text = "[Overdex] - Load script v28",
     Duration = 5
 })
-print("anh jung dz v26")
 repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
 local Config = getgenv().Config
 local FeedConfig = Config["Auto Feed"] or {}
@@ -1043,49 +1042,36 @@ function AutoLoadConfig()
 end
 function fixFreezeBalo()
     task.spawn(function()
-        local Players = game:GetService("Players")
-        local Http = game:GetService("HttpService")
+        local Player = game:GetService("Players").LocalPlayer
         local TeleportService = game:GetService("TeleportService")
-        local Player = Players.LocalPlayer
 
-        local FOLDER = "atlas"
-        local PRESET_PATH = FOLDER .. "/Preset 1.json"
-        local STATE_PATH = FOLDER .. "/cf.json"
-        local BEFORE_URL = "https://raw.githubusercontent.com/Overdex-Community/Loader/refs/heads/main/before.txt"
-
-        local CHECK_TIME = 600
-        local LIMIT = 300
-
-        if not isfolder(FOLDER) then
-            makefolder(FOLDER)
-        end
-
-        local state = isfile(STATE_PATH) and Http:JSONDecode(readfile(STATE_PATH)) or {}
-        if state[Player.Name] then return end
-
-        local core = Player:FindFirstChild("CoreStats")
-        local cap = core and core:FindFirstChild("Capacity")
-        if not cap then return end
-
-        local start = tick()
+        local cap = Player:WaitForChild("CoreStats"):WaitForChild("Capacity")
 
         while task.wait(5) do
-            if tick() - start >= CHECK_TIME then
-                if cap.Value < LIMIT then
-                    writefile(PRESET_PATH, game:HttpGet(BEFORE_URL))
-                    state[Player.Name] = true
-                    writefile(STATE_PATH, Http:JSONEncode(state))
+            if cap.Value < 300 then
+                
+                local start = tick()
+
+                repeat
+                    task.wait(5)
+                until cap.Value >= 300 or tick() - start >= 600
+
+                if cap.Value < 300 then
+                    writefile("Preset 1.json",
+                        game:HttpGet("https://raw.githubusercontent.com/Overdex-Community/Loader/refs/heads/main/before.txt")
+                    )
+
                     TeleportService:TeleportToPlaceInstance(
                         game.PlaceId,
                         game.JobId,
                         Player
                     )
                 end
-                break
             end
         end
     end)
 end
+fixFreezeBalo()
 AutoLoadConfig()
 task.spawn(function()
     while task.wait(3) do
