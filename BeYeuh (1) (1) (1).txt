@@ -6,7 +6,7 @@ if game.PlaceId ~= ALLOWED_PLACEID then
 end
 game:GetService("StarterGui"):SetCore("SendNotification", {
     Title = "Thông báo",
-    Text = "[Overdex] - Load script v26",
+    Text = "[Overdex] - Load script v27",
     Duration = 5
 })
 print("anh jung dz v26")
@@ -1067,6 +1067,11 @@ task.spawn(function()
         autoPrinter()
     end
 end)
+game:GetService("StarterGui"):SetCore("SendNotification", {
+    Title = "Thông báo",
+    Text = "[Overdex] - Load done v27",
+    Duration = 5
+})
 while true do
     autoBuyEggTicket()
     checkStarSign()
