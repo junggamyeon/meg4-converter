@@ -383,7 +383,8 @@ local function countReached(bees, targetLevel)
     end
     return n
 end
-FEED_LOCKED = FEED_LOCKED or nil
+FEED_LOCKED = FEED_LOCKED or {}
+FEED_LOCK_FINAL = FEED_LOCK_FINAL or false
 FEED_DONE = FEED_DONE or false
 
 local function autoFeed()
@@ -398,26 +399,57 @@ local function autoFeed()
     local bees = getBees()
     if not bees or #bees == 0 then return end
 
-    if not FEED_LOCKED then
-        table.sort(bees, function(a, b)
-            return a.level > b.level
-        end)
+    local function beeKey(col, row)
+        return tostring(col) .. ":" .. tostring(row)
+    end
 
-        FEED_LOCKED = {}
-        for _, b in ipairs(bees) do
-            FEED_LOCKED[#FEED_LOCKED + 1] = {
-                col = b.col,
-                row = b.row,
-                level = b.level
-            }
-            if #FEED_LOCKED >= maxCount then break end
+    local function lockedCount()
+        local c = 0
+        for _ in pairs(FEED_LOCKED) do c += 1 end
+        return c
+    end
+
+    local live = {}
+    for _, b in ipairs(bees) do
+        live[beeKey(b.col, b.row)] = b
+    end
+
+    for k, lb in pairs(FEED_LOCKED) do
+        local cur = live[k]
+        if cur then
+            lb.level = cur.level
+        else
+            if not FEED_LOCK_FINAL then
+                FEED_LOCKED[k] = nil
+            end
         end
     end
 
-    if #FEED_LOCKED < maxCount then return end
+    if not FEED_LOCK_FINAL then
+        local need = maxCount - lockedCount()
+        if need > 0 then
+            table.sort(bees, function(a, b)
+                return a.level > b.level
+            end)
+            for _, b in ipairs(bees) do
+                if lockedCount() >= maxCount then break end
+                local k = beeKey(b.col, b.row)
+                if not FEED_LOCKED[k] then
+                    FEED_LOCKED[k] = { col = b.col, row = b.row, level = b.level }
+                end
+            end
+            if lockedCount() >= maxCount then
+                FEED_LOCK_FINAL = true
+            end
+        else
+            FEED_LOCK_FINAL = true
+        end
+    end
+
+    if lockedCount() < maxCount then return end
 
     local reached = 0
-    for _, b in ipairs(FEED_LOCKED) do
+    for _, b in pairs(FEED_LOCKED) do
         if b.level >= targetLevel then
             reached += 1
         end
@@ -429,16 +461,12 @@ local function autoFeed()
         return
     end
 
-    local minLevel = math.huge
-    for _, b in ipairs(FEED_LOCKED) do
-        minLevel = math.min(minLevel, b.level)
-    end
-
     local target
-    for _, b in ipairs(FEED_LOCKED) do
-        if b.level == minLevel then
+    local minLevel = math.huge
+    for _, b in pairs(FEED_LOCKED) do
+        if b.level < targetLevel and b.level < minLevel then
+            minLevel = b.level
             target = b
-            break
         end
     end
     if not target then return end
