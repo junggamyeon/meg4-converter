@@ -215,7 +215,55 @@ local function getInventory(cache)
     end
     return inv
 end
+local function getCurrentQuestFromActive(cache)
+    cache = cache or getCache()
+    local active = cache and cache.Quests and cache.Quests.Active
+    if type(active) ~= "table" then return nil end
 
+    local activeSet = {}
+    for _, v in pairs(active) do
+        local n = v and v.Name
+        if n then
+            n = tostring(n)
+            if QUEST_TREAT_REQ[n] ~= nil then
+                activeSet[n] = true
+            end
+        end
+    end
+
+    for _, q in ipairs(QUEST_ORDER) do
+        if activeSet[q] then
+            return q
+        end
+    end
+    return nil
+end
+
+local function getGlobalReserveFromCurrent(currentQuest)
+    local treat = 0
+    local fruits = {}
+    local started = (currentQuest == nil)
+
+    for _, q in ipairs(QUEST_ORDER) do
+        if not started and q == currentQuest then
+            started = true
+        end
+        if started then
+            treat += (QUEST_TREAT_REQ[q] or 0)
+            local f = QUEST_FRUIT_REQ[q]
+            if f then
+                for name, amt in pairs(f) do
+                    fruits[name] = (fruits[name] or 0) + amt
+                end
+            end
+        end
+    end
+
+    if currentQuest == nil then
+        return treat, fruits
+    end
+    return treat, fruits
+end
 local function getBees(cache)
     cache = cache or getCache()
     local bees = {}
@@ -386,9 +434,9 @@ local function autoFeed()
     end
     if not target then return end
 
-    local currentQuest = getCurrentQuest(completed)
-    local isFinalQuest = (currentQuest == "Seven To Seven" or currentQuest == "Picking Out Pineapples")
-    local reserveTreat, reserveFruits = getGlobalReserve(completed)
+    local currentQuest = getCurrentQuestFromActive(cache)
+    local isFinalQuest = (currentQuest == "Seven To Seven")
+    local reserveTreat, reserveFruits = getGlobalReserveFromCurrent(currentQuest)
 
     local inventory = getInventory(cache)
     local bondLeft = getBondLeft(target.col, target.row)
