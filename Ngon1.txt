@@ -6,7 +6,7 @@ end
 
 game:GetService("StarterGui"):SetCore("SendNotification", {
     Title = "Thông báo",
-    Text = "[Overdex] - Load script v28 (Optimized)",
+    Text = "[Overdex] - Load script v29",
     Duration = 5
 })
 
@@ -906,7 +906,28 @@ end
 
 AutoLoadConfig()
 fixFreezeBalo()
+local function redeemCodes()
 
+    for _,code in ipairs({
+        "38217","BeesBuzz123","BopMaster",
+        "Connoisseur","Crawlers","Nectar",
+        "Roof","Wax"
+    }) do
+        pcall(function()
+            Events.PromoCodeEvent:FireServer(code)
+        end)
+        task.wait(1.2)
+    end
+
+    while #getBees() < 15 do
+        task.wait(8)
+    end
+
+    pcall(function()
+        Events.PromoCodeEvent:FireServer("ClubBean")
+    end)
+end
+redeemCodes()
 local Scheduler = {}
 Scheduler.__index = Scheduler
 
