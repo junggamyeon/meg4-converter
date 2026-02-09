@@ -343,8 +343,7 @@ local function autoFeed()
     end
 
     if not FEED_LOCK_FINAL then
-        local need = maxCount - lockedCount()
-        if need > 0 then
+        if lockedCount() < maxCount then
             table.sort(bees, function(a, b) return a.level > b.level end)
             for _, b in ipairs(bees) do
                 if lockedCount() >= maxCount then break end
@@ -363,19 +362,19 @@ local function autoFeed()
         end
     end
 
-    if lockedCount() < maxCount then return end
-
-    local reached = 0
-    for _, b in pairs(FEED_LOCKED) do
-        if b.level >= targetLevel then
-            reached += 1
+    if lockedCount() >= maxCount then
+        local reached = 0
+        for _, b in pairs(FEED_LOCKED) do
+            if b.level >= targetLevel then
+                reached += 1
+            end
         end
-    end
 
-    if reached >= maxCount then
-        FEED_DONE = true
-        getgenv().FEED_DONE = true
-        return
+        if reached >= maxCount then
+            FEED_DONE = true
+            getgenv().FEED_DONE = true
+            return
+        end
     end
 
     local target, minLevel = nil, math.huge
