@@ -907,24 +907,28 @@ end
 AutoLoadConfig()
 fixFreezeBalo()
 local function redeemCodes()
+    task.spawn(function()
 
-    for _,code in ipairs({
-        "38217","BeesBuzz123","BopMaster",
-        "Connoisseur","Crawlers","Nectar",
-        "Roof","Wax"
-    }) do
+        local codes = {
+            "38217","BeesBuzz123","BopMaster",
+            "Connoisseur","Crawlers","Nectar",
+            "Roof","Wax"
+        }
+
+        for _,code in ipairs(codes) do
+            pcall(function()
+                Events.PromoCodeEvent:FireServer(code)
+            end)
+            task.wait(1.2)
+        end
+
+        repeat task.wait(8)
+        until #getBees() >= 15
+
         pcall(function()
-            Events.PromoCodeEvent:FireServer(code)
+            Events.PromoCodeEvent:FireServer("ClubBean")
         end)
-        task.wait(1.2)
-    end
 
-    while #getBees() < 15 do
-        task.wait(8)
-    end
-
-    pcall(function()
-        Events.PromoCodeEvent:FireServer("ClubBean")
     end)
 end
 redeemCodes()
