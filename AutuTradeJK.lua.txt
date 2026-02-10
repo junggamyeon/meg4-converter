@@ -1,0 +1,469 @@
+
+repeat task.wait() until game:IsLoaded()
+print("1")
+local Players = game:GetService("Players")
+local RS = game:GetService("ReplicatedStorage")
+local GuiService = game:GetService("GuiService")
+local VIM = game:GetService("VirtualInputManager")
+
+local LP = Players.LocalPlayer
+local Config = getgenv().Config or {}
+
+local CHANGE_MAIN_AT = tonumber(Config["Change Acc Main When Has Sticker"] or 0)
+
+local StickerTypes = require(RS.Stickers.StickerTypes)
+local ClientStatCache = require(RS.ClientStatCache)
+local Events = require(RS.Events)
+
+local WROTE_MAIN_FILE = false
+local LAST_SESSION_ID = nil
+local SESSION_LOCKED = false
+
+local MAIN_LIST = {}
+
+local function normalize(str)
+    return tostring(str):lower():gsub("%s+", "")
+end
+
+local function tradeAnchor()
+    for _, v in ipairs(LP.PlayerGui:GetDescendants()) do
+        if v.Name == "TradeAnchorFrame" then
+            return v
+        end
+    end
+end
+
+local function waitForTradeAnchor(timeout)
+    local t0 = tick()
+    while true do
+        local anchor = tradeAnchor()
+        if anchor then return anchor end
+        if timeout and tick() - t0 > timeout then return nil end
+        task.wait(0.25)
+    end
+end
+
+local LAST_CLICK = 0
+local CLICK_DELAY = 0.15
+
+local function fireConnections(signal)
+    local ok, conns = pcall(function()
+        return getconnections(signal)
+    end)
+    if not ok or not conns then return false end
+
+    for _, c in ipairs(conns) do
+        if typeof(c.Function) == "function" then
+            local success = pcall(c.Function)
+            if success then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+local function smartGuiClick(btn)
+    if not btn then return false end
+    if not btn.Visible or not btn.Active then return false end
+    if tick() - LAST_CLICK < CLICK_DELAY then return false end
+
+    LAST_CLICK = tick()
+
+    if btn:IsA("GuiButton") then
+        -- Ưu tiên logic nội bộ của game
+        if fireConnections(btn.Activated) then return true end
+        if fireConnections(btn.MouseButton1Click) then return true end
+
+        -- Fallback Roblox native
+        pcall(function()
+            btn:Activate()
+        end)
+
+        return true
+    end
+
+    return false
+end
+
+local function pushMain(v)
+    if not v then return end
+    MAIN_LIST[#MAIN_LIST + 1] = normalize(v)
+end
+
+if type(Config["Main Account"]) == "table" then
+    for _, v in ipairs(Config["Main Account"]) do
+        pushMain(v)
+    end
+else
+    pushMain(Config["Main Account"])
+end
+
+local function isMainPlayer(p)
+    if not p then return false end
+    local uid = normalize(p.UserId)
+    local name = normalize(p.Name)
+    local dname = normalize(p.DisplayName)
+
+    for _, main in ipairs(MAIN_LIST) do
+        if uid == main or name == main or dname == main then
+            return true
+        end
+    end
+    return false
+end
+
+local function isMain()
+    return isMainPlayer(LP)
+end
+
+local function findMain()
+    for _, p in ipairs(Players:GetPlayers()) do
+        if isMainPlayer(p) then
+            return p
+        end
+    end
+end
+
+local function getStickerNameById(typeId)
+    for name, def in pairs(StickerTypes.Types) do
+        if def.ID == typeId then
+            return name
+        end
+    end
+    return "Unknown"
+end
+
+local function getBook()
+    local ok, cache = pcall(function()
+        return ClientStatCache:Get()
+    end)
+    if not ok or not cache then return nil end
+    return cache.Stickers and cache.Stickers.Book
+end
+
+local function getValidStickers(book)
+    local list = {}
+    if not book then return list end
+
+    for _, data in ipairs(book) do
+        local slot1, slot2, slot3, slot4 = data[1], data[2], data[3], data[4]
+        local typeId = data.TypeID or slot3
+        local name = getStickerNameById(typeId)
+
+        for _, cfg in ipairs(Config["Sticker Trade"] or {}) do
+            if normalize(cfg) == normalize(name) then
+                list[#list + 1] = {
+                    Name = name,
+                    File = {slot1, slot2, slot3, slot4}
+                }
+                break
+            end
+        end
+    end
+
+    return list
+end
+
+local function getStickerSlotCount()
+    local book = getBook()
+    if not book then return 0 end
+    return #book
+end
+
+local function getRemote(name)
+    return RS:FindFirstChild("Events", true)
+        and RS.Events:FindFirstChild(name, true)
+end
+
+local function addSticker(sessionId, file)
+    local ev = getRemote("TradePlayerAddItem")
+    if not ev then return end
+
+    ev:FireServer(sessionId, {
+        Category = "Sticker",
+        File = {
+            [1] = file[1],
+            [2] = file[2],
+            [3] = file[3],
+            [4] = file[4]
+        }
+    })
+end
+
+local function acceptTrade(sessionId, altId, mainId, packs)
+    local ev = getRemote("TradePlayerAccept")
+    if not ev then return end
+
+    ev:FireServer(sessionId, {
+        [tostring(altId)] = packs,
+        [tostring(mainId)] = {}
+    })
+end
+
+local function completed(tag)
+    pcall(function()
+        writefile(LP.Name .. ".txt", tag or "Completed-DaTrade")
+    end)
+end
+
+Events.ClientListen("TradeUpdateInfo", function(info)
+    if not info or not info.SessionID then return end
+    if tradeAnchor() then return end
+    if SESSION_LOCKED then return end
+    if tostring(info.State or ""):lower() ~= "ongoing" then return end
+
+    LAST_SESSION_ID = tonumber(info.SessionID)
+    SESSION_LOCKED = true
+end)
+
+local function startMain()
+    local firstOpenTime = nil
+
+    Events.ClientListen("TradeInformOfRequest", function(_, sessionId)
+        task.wait(0.1)
+        Events.ClientCall("TradePlayerConfirmStart", sessionId)
+    end)
+
+    while true do
+        local anchor = tradeAnchor()
+
+        if anchor then
+            if not firstOpenTime then
+                firstOpenTime = tick()
+            end
+
+            if tick() - firstOpenTime >= 2 then
+                local ok, btn = pcall(function()
+                    return anchor.TradeFrame.ButtonAccept.ButtonTop
+                end)
+
+                if ok and btn and btn.Visible then
+                    local ok2, label = pcall(function()
+                        return btn:FindFirstChild("TextLabel", true)
+                    end)
+
+                    if ok2 and label and tostring(label.Text):lower() == "accept" then
+                        smartGuiClick(btn)
+                    end
+                end
+            end
+        else
+            firstOpenTime = nil
+        end
+
+        if CHANGE_MAIN_AT > 0 and not WROTE_MAIN_FILE then
+            if getStickerSlotCount() >= CHANGE_MAIN_AT then
+                WROTE_MAIN_FILE = true
+                completed("Completed-MainAutoTrade")
+            end
+        end
+
+        task.wait(3)
+    end
+end
+
+local function startAlt()
+    local main
+    repeat
+        main = findMain()
+        task.wait(1)
+    until main
+
+    while true do
+        local book = getBook()
+        local valid = getValidStickers(book)
+
+        if #valid == 0 then
+            completed("Completed-DaTrade")
+            return
+        end
+
+        if not tradeAnchor() and SESSION_LOCKED then
+            SESSION_LOCKED = false
+            LAST_SESSION_ID = nil
+        end
+
+        if not tradeAnchor() then
+            pcall(function()
+                RS.Events.TradePlayerRequestStart:FireServer(main.UserId)
+            end)
+        end
+
+        local anchor = waitForTradeAnchor(30)
+        if not anchor then
+            task.wait(2)
+            continue
+        end
+
+        local t0 = tick()
+        while tradeAnchor() and not LAST_SESSION_ID do
+            if tick() - t0 > 15 then break end
+            task.wait(0.1)
+        end
+
+        if not LAST_SESSION_ID then
+            SESSION_LOCKED = false
+            task.wait(2)
+            continue
+        end
+
+        local sessionId = LAST_SESSION_ID
+        local packs = {}
+        local idx = 1
+
+        for _, sticker in ipairs(valid) do
+            while not tradeAnchor() do
+                SESSION_LOCKED = false
+                LAST_SESSION_ID = nil
+                task.wait(1)
+                main = findMain()
+                if main then
+                    pcall(function()
+                        RS.Events.TradePlayerRequestStart:FireServer(main.UserId)
+                    end)
+                end
+            end
+
+            addSticker(sessionId, sticker.File)
+
+            packs[idx] = {
+                Pack = {
+                    File = {
+                        [1] = sticker.File[1],
+                        [2] = sticker.File[2],
+                        [3] = sticker.File[3],
+                        [4] = sticker.File[4]
+                    },
+                    Category = "Sticker"
+                },
+                Validated = false,
+                Owner = tostring(LP.UserId),
+                IDString = "U" .. LP.UserId .. ":Sticker:" .. table.concat(sticker.File, "-"),
+                ClientSide = true
+            }
+
+            idx += 1
+            task.wait(0.2)
+        end
+
+        if tradeAnchor() and #packs > 0 then
+            task.wait(0.5)
+            acceptTrade(sessionId, LP.UserId, main.UserId, packs)
+        end
+
+        repeat
+            task.wait(0.5)
+        until not tradeAnchor()
+
+        SESSION_LOCKED = false
+        LAST_SESSION_ID = nil
+        task.wait(2)
+    end
+end
+local function runTrashDiscardLoop()
+    task.spawn(function()
+        while true do
+            if Config["Discard trash sticker"] then
+                local book = getBook()
+                if book then
+                    for _, data in ipairs(book) do
+                        local slot1, slot2, slot3, slot4 = data[1], data[2], data[3], data[4]
+                        local typeId = data.TypeID or slot3
+                        local name = getStickerNameById(typeId)
+
+                        local allowed = false
+                        for _, cfg in ipairs(Config["Sticker Trade"] or {}) do
+                            if normalize(cfg) == normalize(name) then
+                                allowed = true
+                                break
+                            end
+                        end
+
+                        if not allowed then
+                            local ev = getRemote("StickerDiscard")
+                            if ev then
+                                ev:FireServer({
+                                    [1] = slot1,
+                                    [2] = slot2,
+                                    [3] = slot3,
+                                    [4] = slot4
+                                }, false)
+                                task.wait(0.3)
+                            end
+                        end
+                    end
+                end
+            end
+            task.wait(5)
+        end
+    end)
+end
+local function runAutoClaimStickerInbox()
+    task.spawn(function()
+        while true do
+            if Config["Auto Claim Sticker Inbox"] then
+                local ok, cache = pcall(function()
+                    return ClientStatCache:Get()
+                end)
+
+                if ok and cache and cache.Stickers and cache.Stickers.Inbox then
+                    local inbox = cache.Stickers.Inbox
+                    local book = getBook() or {}
+
+                    local usedSlots = {}
+                    for _, data in ipairs(book) do
+                        local slot = data[4] or data.Slot
+                        if slot then
+                            usedSlots[slot] = true
+                        end
+                    end
+
+                    local function findEmptySlot()
+                        local i = 1
+                        while true do
+                            if not usedSlots[i] then
+                                return i
+                            end
+                            i += 1
+                        end
+                    end
+
+                    local ev = getRemote("StickerClaimFromInbox")
+                    if ev then
+                        for i = #inbox, 1, -1 do
+                            local data = inbox[i]
+
+                            local slot1 = data[1]
+                            local slot2 = data[2]
+                            local slot3 = data[3]
+                            local emptySlot = findEmptySlot()
+                            usedSlots[emptySlot] = true
+
+                            ev:FireServer({
+                                [1] = slot1,
+                                [2] = slot2,
+                                [3] = slot3,
+                                [4] = emptySlot
+                            }, false)
+
+                            table.remove(inbox, i)
+                            task.wait(0.4)
+                        end
+                    end
+                end
+            end
+
+            task.wait(5)
+        end
+    end)
+end
+task.spawn(function()
+    if isMain() then
+        startMain()
+    else
+        startAlt()
+    end
+end)
+runTrashDiscardLoop()
+runAutoClaimStickerInbox()
