@@ -256,6 +256,8 @@ local function startMain()
             if getStickerSlotCount() >= CHANGE_MAIN_AT then
                 WROTE_MAIN_FILE = true
                 completed("Completed-MainAutoTrade")
+                task.wait(1)
+                LP:Kick("[Overdex] - Trade done!")
             end
         end
 
@@ -276,6 +278,8 @@ local function startAlt()
 
         if #valid == 0 then
             completed("Completed-DaTrade")
+            task.wait(1)
+            LP:Kick("[Overdex] - Trade done!")
             return
         end
 
