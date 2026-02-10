@@ -1,4 +1,4 @@
-
+task.wait(10)
 repeat task.wait() until game:IsLoaded()
 print("1")
 local Players = game:GetService("Players")
@@ -8,7 +8,8 @@ local VIM = game:GetService("VirtualInputManager")
 
 local LP = Players.LocalPlayer
 local Config = getgenv().Config or {}
-
+repeat task.wait() until LP:FindFirstChild("PlayerGui")
+task.wait(1)
 local CHANGE_MAIN_AT = tonumber(Config["Change Acc Main When Has Sticker"] or 0)
 
 local StickerTypes = require(RS.Stickers.StickerTypes)
