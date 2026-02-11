@@ -3,10 +3,15 @@ if game.PlaceId ~= ALLOWED_PLACEID then
     warn("Wrong PlaceId, script stopped:", game.PlaceId)
     return
 end
-
 game:GetService("StarterGui"):SetCore("SendNotification", {
     Title = "Thông báo",
-    Text = "[Overdex] - Load script v29",
+    Text = "[Overdex] - Key check success!",
+    Duration = 5
+})
+task.wait(1)
+game:GetService("StarterGui"):SetCore("SendNotification", {
+    Title = "Thông báo",
+    Text = "[Overdex] - Load script v30",
     Duration = 5
 })
 
@@ -786,7 +791,17 @@ local function getAllStickersNew(cache)
     readList(cache.Stickers.Inbox)
     return result
 end
+local function farmSync()
+    local cfg = getgenv().Config and getgenv().Config["Change Acc FarmSync"]
+    if not cfg or not cfg.Enable then return nil end
+    
+    local from, to = cfg["Folder from"], cfg["Folder to"]
+    if not from or not to then return nil end
 
+    pcall(function()
+        getgenv().client:ChangeToFolder(from, to, false)
+    end)
+end
 local function checkStarSign()
     if STATE.WROTE_STATUS then return end
 
@@ -847,6 +862,7 @@ local function checkStarSign()
             hopToJob()
         else
             writeStatus("Completed-CoStarSign")
+            farmSync()
             STATE.WROTE_STATUS = true
         end
         return
