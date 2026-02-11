@@ -877,6 +877,8 @@ local function checkStarSign()
         else
             writeStatus("Completed-CoStarSign")
             farmSyncCoStarSign()
+            task.wait(2)
+            game:Shutdown()
             STATE.WROTE_STATUS = true
         end
         return
@@ -901,6 +903,8 @@ local function checkStarSign()
             elseif now() - STATE.NO_STAR_TIMER >= 20 then
                 writeStatus("Completed-KoStarSign")
                 farmSyncKoStarSign()
+                task.wait(2)
+                game:Shutdown()
                 STATE.WROTE_STATUS = true
                 return
             end
