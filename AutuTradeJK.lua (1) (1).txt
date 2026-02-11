@@ -1,5 +1,14 @@
 repeat task.wait() until game:IsLoaded()
-
+task.wait(10)
+print("AntiAfk Activated")
+local VirtualUser = game:service'VirtualUser'
+repeat
+    wait()
+until game:GetService("Players").LocalPlayer ~= nil and game:GetService("Players").LocalPlayer.Idled ~= nil
+game:GetService("Players").LocalPlayer.Idled:connect(function()
+    VirtualUser:CaptureController()
+    VirtualUser:ClickButton2(Vector2.new())
+end)
 local Players = game:GetService("Players")
 local RS = game:GetService("ReplicatedStorage")
 
