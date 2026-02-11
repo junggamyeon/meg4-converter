@@ -791,11 +791,25 @@ local function getAllStickersNew(cache)
     readList(cache.Stickers.Inbox)
     return result
 end
-local function farmSync()
+local function farmSyncCoStarSign()
     local cfg = getgenv().Config and getgenv().Config["Change Acc FarmSync"]
-    if not cfg or not cfg.Enable then return nil end
+    local star = cfg and cfg["Have Star Sign"]
+    if not cfg or not cfg.Enable or not star then return nil end
     
-    local from, to = cfg["Folder from"], cfg["Folder to"]
+    local from, to = star["Folder from"], star["Folder to"]
+    if not from or not to then return nil end
+
+    pcall(function()
+        getgenv().client:ChangeToFolder(from, to, false)
+    end)
+end
+
+local function farmSyncKoStarSign()
+    local cfg = getgenv().Config and getgenv().Config["Change Acc FarmSync"]
+    local nostar = cfg and cfg["No Star Sign"]
+    if not cfg or not cfg.Enable or not nostar then return nil end
+    
+    local from, to = nostar["Folder from"], nostar["Folder to"]
     if not from or not to then return nil end
 
     pcall(function()
@@ -862,7 +876,7 @@ local function checkStarSign()
             hopToJob()
         else
             writeStatus("Completed-CoStarSign")
-            farmSync()
+            farmSyncCoStarSign()
             STATE.WROTE_STATUS = true
         end
         return
@@ -886,6 +900,7 @@ local function checkStarSign()
                 STATE.NO_STAR_TIMER = now()
             elseif now() - STATE.NO_STAR_TIMER >= 20 then
                 writeStatus("Completed-KoStarSign")
+                farmSyncKoStarSign()
                 STATE.WROTE_STATUS = true
                 return
             end
