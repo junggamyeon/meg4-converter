@@ -5,12 +5,6 @@ if game.PlaceId ~= ALLOWED_PLACEID then
 end
 game:GetService("StarterGui"):SetCore("SendNotification", {
     Title = "Thông báo",
-    Text = "[Overdex] - Key check success!",
-    Duration = 5
-})
-task.wait(1)
-game:GetService("StarterGui"):SetCore("SendNotification", {
-    Title = "Thông báo",
     Text = "[Overdex] - Load script v30",
     Duration = 5
 })
